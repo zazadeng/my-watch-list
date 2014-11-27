@@ -1,30 +1,13 @@
 (ns my-watch-list.core
   (:import (java.io PushbackReader InputStreamReader FileInputStream))
-  (:use hickory.core)
+  (:use my-watch-list.classifier
+        hickory.core
+        )
   (:require [clj-http.client]
             [hickory.select :as st]
             [clojure.data.json :as json]
             [clojure.edn :as ed]
             ))
-
-(def color-reg #"[灰蓝绿白红]+")
-(def size-reg #"\"\s*[34][0-9]\s*\"")
-(def price-reg #"[1-9]\d*\.\d+")
-(def gender-reg #"[女男].")
-
-(def action 
-  {:shopping 
-   { :color color-reg
-     :size size-reg
-     :price price-reg
-     :gender gender-reg
-    }
-   }
-)
-
-(defn extract-words [key data]
-  (map (fn [reg-map-entry](into #{} (re-seq (val reg-map-entry) (str data))))(key action))
-  )
 
 (defn get-content-array
   ([vals]
