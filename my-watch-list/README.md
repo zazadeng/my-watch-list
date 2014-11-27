@@ -1,4 +1,4 @@
-# chinese-site-extractor
+# my-watch-list
 
 A simple web service mimic the idea of shopping list.
 
