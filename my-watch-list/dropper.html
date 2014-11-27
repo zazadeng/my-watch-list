@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="jsLib/angular.js"></script>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+ <style type="text/css">
+  body {
+    font: 10px sans-serif;
+    text-rendering: optimizelegibility;
+  }
+  .hover_group rect{
+    stroke: steelblue;
+  }
+  .hover_group:hover rect {
+    fill: aliceblue;
+  }
+  text {
+    cursor: pointer;
+    font: 15px sans-serif;
+  }
+  rect {
+    fill : white;
+  }
+  #div_container{
+   width:100%;
+  }
+  #div_left {
+    float: left;
+    width:45%;
+    border:1px solid steelblue;
+    font: 20px sans-serif;
+  }
+  #div_right {
+      float: right;
+      width:50%;
+   }
+   #summary_list{
+       font: 10px sans-serif;
+   }
+   #summary_list li:hover {
+    cursor: pointer;
+    font: 13px sans-serif;
+   }
+   .selected_item {
+    fill : orange;
+    color : orange;
+   }
+
+   <!--angular -->
+.ng-modal-overlay {
+  /* A dark translucent div that covers the whole screen */
+  position:absolute;
+  z-index:9999;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background-color:#000000;
+  opacity: 0.8;
+}
+.ng-modal-dialog {
+  /* A centered div above the overlay with a box shadow. */
+  z-index:10000;
+  position: absolute;
+  width: 50%; /* Default */
+
+  /* Center the dialog */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  -webkit-transform: translate(-50%, -50%);
+  -moz-transform: translate(-50%, -50%);
+
+  background-color: #fff;
+  box-shadow: 4px 4px 80px #000;
+}
+.ng-modal-dialog-content {
+  padding:10px;
+  text-align: left;
+}
+.ng-modal-close {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  padding: 5px;
+  cursor: pointer;
+  font-size: 120%;
+  display: inline-block;
+  font-weight: bold;
+  font-family: 'arial', 'sans-serif';
+}
+
+  </style>
+ </head>
+ <body ng-app='ModalDemo'>
+  <div id="div_container">
+    <div id="div_left" ondrop="drop(event)" ondragover="allowDrop(event)">DROP an link here...</div>
+    <div id="div_right"></div>
+ </div>
+ <div id='load'></div>
+ </body>
+ <script src="jsLib/d3.v3.min.js" charset="utf-8"></script>
+ <!--<script src="jsLib/jquery-2.1.1.min.js" charset="utf-8"></script>-->
+ <script>
+ var dat = d3.set([]);
+
+ /****************************************
+  * helper functions
+  ***************************************/
+  var getParentWithTag = function(node, tag){
+    if(node === null){
+      return node;
+    }
+    if(node.nodeName === tag){
+      return node;
+    }
+    return getParentWithTag(node.parentNode, tag);
+  }
+
+  var makeSVG = function (obj, uri, yAxis, id){
+     var keys = Object.keys(obj);
+     var maxLength =  d3.max(keys.map(function(e){return obj[e].toString().length;}));
+     var maxValueSize =  d3.max(keys.map(function(e){return obj[e].length;}));
+     var rec_height = 50;
+     var padding = 30;
+
+     var svg = d3.select('#div_right').append('svg')
+                                  .attr("width", 15*maxLength+padding)
+                                  .attr("height", (keys.length+1)*rec_height+yAxis+padding)
+                                  .attr("uri", uri)
+                                  .data([JSON.stringify(obj)])
+                                  .attr("class", "select_svg")
+                                  .attr("id", id)
+
+     //eg: {"name":"gender", "value":[ {"name":"女款"}, {"name": "女鞋"}] };
+     var array = d3.range(0,keys.length)
+                  .map(function(i){
+                    return { "name": keys[i]};
+                    })
+                  .map(function(o){
+                    o["value"] = d3.range(0,  obj[o["name"]].length).map(function(ii){
+                      return {"name":  obj[o["name"]][ii]};
+                      });
+                    return o;
+                    });
+
+     var ordinal = d3.scale.ordinal().domain(d3.range(0,maxValueSize)).rangeBands([0, 15*maxLength],0.1);
+     var node = svg.selectAll("hover_group").data(array);
+
+     node.enter().append('g')
+                   .transition()
+                   .delay(function(d,i){return i*20;})
+                   .attr("class", "hover_group")
+                   .attr("transform", function(d) { return "translate(10,"+ yAxis +")"; })
+
+     node.append("title").text(function(d){return d.name;});
+
+     node.append("rect")
+          .attr("y", function(d,i){ return i*rec_height; })
+          .attr("width", 15*maxLength)
+          .attr("height", rec_height)
+
+     node.selectAll('text').data(function(d,i){return d.value.map(function(o){o.l=i; return o;})})
+       .enter()
+        .append('text')
+          .attr("class", "not_selected_item")
+          .attr("x", function(dd, ii){ return ordinal(ii);})
+          .attr("dx", ".75em")
+          .attr("y", function(dd){ return dd.l*rec_height + 30;})
+          .text(function(d){return d.name})
+          .call(clickOnSelectionItem)
+
+  };
+
+ /****************************************
+  * event functions
+  ***************************************/
+  var clickOnListItemOnTheLeft = function(sel, ob){
+        this.on("click.show_list_button", function(d){
+                d3.select("#div_right ol").style("display", "none");
+                d3.selectAll("#summary_list li").attr("class", null);
+                d3.select(this).attr("class", "selected_item");
+                var svgNotExist = d3.selectAll(".select_svg")
+                                  .style("display", "none")
+                                  .filter(function(){return this.getAttribute("uri") === d;})
+                                  .style("display", null)
+                                  .empty();
+
+                if(svgNotExist){
+                  makeSVG(ob, d, d3.mouse(getParentWithTag(this, 'DIV'))[1], d3.select(this).attr("id"));
+                }
+                var listButton = d3.select("#list_button");
+                listButton.style("display", "none");//reset
+                if( d3.selectAll("#summary_list li").size() == (d3.selectAll(".select_svg")).size()){
+                  listButton.style("display", "inline");
+                }
+
+          })
+
+        this.on("click.show_hide_buttons", function(){
+               d3.select("#del_button").style("display", "inline");
+               d3.select("#copy_button").style("display", "none");
+            })
+  }
+
+  var buttonOnMouseEvent = function(){
+       this.on('mouseover', function(){d3.select(this).style('stroke-width', 3)})
+        .on('mousedown', function(){d3.select(this).style('stroke-width', 8)})
+        .on('mouseout', function(){d3.select(this).style('stroke-width', null)})
+
+  }
+
+  var clickOnListButton = function(){
+          this.on("click", function(){
+                              generateList();
+                              d3.selectAll("#summary_list li").attr("class", null);
+                              d3.selectAll(".select_svg").style("display", "none");
+                              d3.select("#div_right ol").style("display", null);
+                              d3.select(this).style("display", "none");
+                              d3.select("#del_button").style("display", "none");
+                              d3.select("#copy_button").style("display", null);
+
+                })
+              .call(buttonOnMouseEvent)
+   }
+
+  var clickOnDelButton = function(){
+    this.on("click", function(){
+                      d3.select(this).style("display", "none");
+                      dat.remove(d3.select("#summary_list .selected_item").attr("uri"));
+                      d3.selectAll("#" + d3.select("#summary_list .selected_item").attr("id")).remove();
+          })
+          .call(buttonOnMouseEvent)
+  }
+
+  var clickOnCopyButton = function(){
+  this.on("click.onMouseActions", function(){
+      d3.select(this).style("display", "none")
+      var txt = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>';
+      d3.selectAll("#div_right ol li")
+          .each(function(){
+            var st = d3.select(this).text();
+            txt += '<a href="'+ st.substring(0, st.indexOf("{")).trim()+'">'+ st + '</a>'+'<br />'
+            })
+          txt += '</body></html>'
+          d3.select("#modalContent").text(txt);
+
+          //console.log(txt);
+      })
+      .call(buttonOnMouseEvent)
+  }
+
+  var clickOnSelectionItem = function(){
+    this.on("click", function(){
+                       var c = d3.select(this);
+                       c.attr("class") === 'selected_item'
+                          ? c.attr("class", "not_selected_item")
+                          : c.attr("class", "selected_item");
+                     })
+  }
+
+ /****************************************
+  * STARTS HERE
+  ***************************************/
+   var WS_URI = 'http://localhost:8080/extractor?uri-string='
+   var div_left = d3.select("#div_left");
+
+   var list_button = div_left.append('svg').attr('width', 30).attr('height', 30).style('float','right')
+                  .append('g').attr('id', 'list_button')
+                  .style({'cursor': 'pointer','display':'none'})
+                  .call(clickOnListButton)
+
+   list_button.append('circle')
+                  .attr('cx', 15).attr('cy', 15).attr('r',8)
+                  .style({'fill':'white', 'stroke':'blue'});
+   list_button.append('title').text('List');
+
+   var del_button = div_left.append('svg').attr('width', 30).attr('height', 30).style('float','right')
+                  .append('g').attr('id', 'del_button')
+                  .style({'cursor': 'pointer','display':'none'})
+                  .call(clickOnDelButton)
+
+   del_button.append('circle')
+                  .attr('cx', 15).attr('cy', 15).attr('r',8)
+                  .style({'fill':'white', 'stroke':'orange'});
+   del_button.append('title').text('delete');
+
+   var modal = div_left.append("div").style('float','right').attr("ng-controller", "MyCtrl");
+   var copy_button = modal.append('svg').attr('width', 30).attr('height', 30)
+                  .append('g').attr('id', 'copy_button')
+                  .style({'cursor': 'pointer','display':'none'})
+                  .call(clickOnCopyButton)
+                  .attr("ng-click", "toggleModal()");
+   copy_button.append('circle')
+                  .attr('cx', 15).attr('cy', 15).attr('r',8)
+                  .style({'fill':'white', 'stroke':'red'});
+   copy_button.append('title').text('copy');
+   modal.append("modal-dialog").attr("show", "modalShown")
+   .attr('width', "90%").attr('height', "80%").append("p").attr("id", "modalContent");//.text("<a herf='google.com'>Something to show here</a>");
+
+
+
+
+   div_left.append("ol").attr("id", "summary_list");
+   d3.select("#div_right").append("ol").style("display", "none");
+
+  var generateList = function(){
+     var result_list = [];
+      d3.selectAll("#summary_list li").each(function(){
+          var id = this.getAttribute("uri");
+          d3.selectAll("svg")
+            .filter(function(){return id === this.getAttribute("uri");})
+            .each(function(){
+                 d3.select(this)
+                    .each(function(d){
+                        d3.select(this)
+                          .selectAll(".not_selected_item")
+                          .each(function(){
+                             d = d.replace('"'+this.textContent+'"', "");
+                          });
+                        result_list.push(id+"\t"+d.replace(/,/g, ''));
+                  });
+
+              })
+
+       });
+     // console.log(result_list);
+     // d3.selectAll("svg.select_svg").style("display", "none");
+      var r_list = d3.select("#div_right ol")
+                     // .style("display", "inline")
+                      .selectAll("li").data(result_list)
+                      .text(function(d){return d});
+
+      r_list.exit().remove();
+      r_list.enter().append("li").text(function(d){
+                              return d;
+          });
+   };
+
+/****************************************
+  * drap and drop events
+  ***************************************/
+  function allowDrop(ev) {
+    ev.preventDefault();
+  }
+
+  function drag(ev) {
+   // ev.dataTransfer.setData("text", ev.target.id);
+  }
+
+function dropAction(){
+    var listItem= d3.select("#summary_list")
+                      .selectAll("li")
+                      .data(dat.values());
+         listItem.exit().remove();
+         listItem.enter()
+                     .append("li")
+                     .each(function(d){
+                          var that = this;
+                          d3.json(WS_URI+d, function(err, json){
+                            if(err) return console.warn(err);
+                            d3.select(that).call(clickOnListItemOnTheLeft, json)})})
+                     .attr("uri", function(d){return d})
+                     .attr("id", function(d){
+                                            return (d.substring(0,100) + Math.random()).replace(/\W/g, "") ;
+                                         })
+                     .text(function(d){return (d.length > 150) ? d.substring(0, 150) + "..." : d;})
+
+}
+
+
+  function drop(ev) {
+    ev.preventDefault();
+   d3.select("#list_button")
+         .style("display", 'none');
+    var link = ev.dataTransfer.getData("text");
+    if(link === ''){
+      console.log("Empty, NOT a link");
+      // fetch first FileList object
+	    var f = ev.dataTransfer.files[0];
+      var reader = new FileReader();
+      reader.onload = function(e) {
+       var html = d3.select("body").append("div").style("display", "none").html(e.target.result);
+       html.selectAll("a").each(function(){dat.add(d3.select(this).attr("href"))});
+       dropAction();
+       html.remove();
+      }
+      reader.readAsText(f);
+      return;
+    }
+
+    dat.add(link);
+    dropAction();
+
+  }
+
+  </script>
+
+  <script>
+    app = angular.module('ModalDemo', []);
+    app.directive('modalDialog', function() {
+      return {
+        restrict: 'E',
+        scope: {
+          show: '='
+        },
+        replace: true, // Replace with the template below
+        transclude: true, // we want to insert custom content inside the directive
+        link: function(scope, element, attrs) {
+          scope.dialogStyle = {};
+          if (attrs.width)
+            scope.dialogStyle.width = attrs.width;
+          if (attrs.height)
+            scope.dialogStyle.height = attrs.height;
+          scope.hideModal = function() {
+            scope.show = false;
+          };
+        },
+        template: "<div class='ng-modal' ng-show='show'><div class='ng-modal-overlay' ng-click='hideModal()'></div><div class='ng-modal-dialog' ng-style='dialogStyle'><div class='ng-modal-close' ng-click='hideModal()'>X</div><div class='ng-modal-dialog-content' ng-transclude></div></div></div>"
+      };
+    });
+
+    app.controller('MyCtrl', ['$scope', function($scope) {
+      $scope.modalShown = false;
+      $scope.toggleModal = function() {
+        $scope.modalShown = !$scope.modalShown;
+      };
+    }]);
+  </script>
+
+</html>

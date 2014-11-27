@@ -1,0 +1,3 @@
+{"dangdang.com" {:content-tag "class \"show_info\"" :action "shopping"}
+ "ncix.com" {:content-tag "id \"div_price\"" :action "shopping"}
+ }
