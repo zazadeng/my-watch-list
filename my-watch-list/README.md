@@ -6,10 +6,10 @@ A simple web service mimic the idea of shopping list.
 Load "web.clj" to REPL by right-clicking in web.clj(clojure -> Load file in REPL)
 
 ## Usage
-open "dropper.html" with Firefox; we could drap and drop
+Open "dropper.html" with Firefox; we could drag and drop:
 
 1. a link from another browser address bar
-2. a html file that has a link of links(Try example_list.html)
+2. a html file that has a list of links(Try example_list.html)
 
 ## License
 
